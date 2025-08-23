@@ -67,30 +67,6 @@ export AZURE_OPENAI_API_KEY="your-azure-openai-api-key"
 export AZURE_OPENAI_ENDPOINT="https://your-resource.cognitiveservices.azure.com/"
 ```
 
-## Example Session
-
-```bash
-$ release-notes
-
-AI Release Notes Generator
-
-? Enter your Azure OpenAI API key: ****
-? Enter your Azure OpenAI endpoint: https://your-resource.cognitiveservices.azure.com/
-? Enter your deployment name: gpt-4o-mini
-? Repository path (press Enter for current directory):
-? How would you like to select commits? Between two specific commits
-? Select the starting commit (OLDER): abc12345 - Initial project setup (John Doe)
-? Select the ending commit (NEWER): def67890 - Add user authentication (Jane Smith)
-? Where would you like the output? Display in console
-? Proceed with release notes generation? Yes
-
-Processing 5 commits between abc12345 and def67890...
-
-Generated Release Notes:
-# Release Notes
-...
-```
-
 ## Requirements
 
 - Node.js 18 or higher
