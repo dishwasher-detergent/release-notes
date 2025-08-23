@@ -1,6 +1,6 @@
 # @knth/release-notes
 
-Core library for generating release notes based on git history using Azure OpenAI.
+Core library for generating release notes from git history using Azure OpenAI.
 
 ## Installation
 
@@ -30,7 +30,6 @@ const generator = new ReleaseNotesGenerator({
   // toCommit: "def456...",
 });
 
-// Generate release notes (streams to console by default)
 const releaseNotes = await generator.generateReleaseNotes();
 console.log(releaseNotes);
 ```
@@ -54,19 +53,18 @@ interface ReleaseNotesOptions {
 
 #### Methods
 
-- `generateReleaseNotes(): Promise<string>` - Generate release notes as markdown string
-- `checkGitRepo(): Promise<void>` - Verify the repository is valid
+- `generateReleaseNotes(): Promise<string>` - Generate release notes as markdown
+- `checkGitRepo(): Promise<void>` - Verify repository validity
 - `getLastCommits(count?: number): Promise<GitCommit[]>` - Get recent commits
 - `getCommitsBetween(from: string, to: string): Promise<GitCommit[]>` - Get commits in range
 
 ## Features
 
-- 🤖 AI-powered release note generation using Azure OpenAI
-- 📝 Analyzes git commits to extract meaningful changes
-- 🎯 Flexible commit selection: last N commits or specific commit range
-- 🌊 Real-time streaming AI responses
-- 🏷️ Categorizes changes into features, bug fixes, breaking changes, and other changes
-- 📄 Outputs clean Markdown format ready for release notes
+- AI-powered release note generation using Azure OpenAI
+- Git commit analysis and categorization
+- Flexible commit selection (last N commits or range)
+- Real-time streaming responses
+- Clean Markdown output format
 
 ## Requirements
 

@@ -1,6 +1,6 @@
 # @knth/release-notes-cli
 
-Interactive CLI for generating release notes based on git history using Azure OpenAI.
+Interactive CLI for generating release notes from git history using Azure OpenAI.
 
 ## Installation
 
@@ -10,7 +10,7 @@ npm install -g @knth/release-notes-cli
 
 ## Usage
 
-Simply run the command and follow the interactive wizard:
+Run the interactive wizard:
 
 ```bash
 release-notes
@@ -22,28 +22,49 @@ Or use the short alias:
 rn
 ```
 
+### Command Line Options
+
+Skip interactive prompts by providing options directly:
+
+```bash
+release-notes --api-key "your-key" --endpoint "https://your-resource.cognitiveservices.azure.com/" --deployment "gpt-4o-mini" --commit-mode "last" --commit-count 5 --output-mode "console"
+```
+
+Available options:
+
+- `--api-key <key>` - Azure OpenAI API key
+- `--endpoint <url>` - Azure OpenAI endpoint URL
+- `--deployment <name>` - Azure OpenAI deployment name (default: gpt-4o-mini)
+- `--repo-path <path>` - Repository path (default: current directory)
+- `--commit-mode <mode>` - Commit selection: `last` or `range`
+- `--commit-count <number>` - Number of recent commits (for last mode)
+- `--from-commit <hash>` - Starting commit hash (for range mode)
+- `--to-commit <hash>` - Ending commit hash (for range mode)
+- `--output-mode <mode>` - Output mode: `console` or `file`
+- `--output-file <filename>` - Output filename (for file mode)
+
 ## Features
 
-- 🧙‍♂️ Interactive CLI wizard - no complex command-line arguments needed
-- 📋 Paginated commit selection with visual browsing
-- 🌊 Real-time streaming AI responses
-- 🔧 Save to file or display in console
-- 🎨 Beautiful terminal output with colors, spinners, and progress indicators
+- Interactive CLI wizard with no complex arguments required
+- Command-line options for automation and scripting
+- Paginated commit selection and browsing
+- Real-time streaming responses
+- Console display or file output
+- Terminal UI with colors and progress indicators
 
 ## How It Works
 
-1. **Interactive Setup**: The CLI wizard guides you through Azure OpenAI configuration and repository selection
-2. **Commit Selection**: Choose between:
-   - **Last N commits**: Specify how many recent commits to analyze
-   - **Commit range**: Browse through commits with pagination and select a specific range
-3. **Output Options**: Display in console with real-time streaming or save to file
+1. Interactive setup guides through Azure OpenAI configuration
+2. Choose commit selection: last N commits or specific range with pagination
+3. Select output options: console display or file save
 
 ## Environment Variables
 
-You can set these environment variables to skip some prompts:
+Set to skip prompts:
 
 ```bash
 export AZURE_OPENAI_API_KEY="your-azure-openai-api-key"
+export AZURE_OPENAI_ENDPOINT="https://your-resource.cognitiveservices.azure.com/"
 ```
 
 ## Example Session
@@ -51,31 +72,21 @@ export AZURE_OPENAI_API_KEY="your-azure-openai-api-key"
 ```bash
 $ release-notes
 
-🚀 AI Release Notes Generator
-
-Let's set up your release notes generation...
+AI Release Notes Generator
 
 ? Enter your Azure OpenAI API key: ****
 ? Enter your Azure OpenAI endpoint: https://your-resource.cognitiveservices.azure.com/
 ? Enter your deployment name: gpt-4o-mini
 ? Repository path (press Enter for current directory):
 ? How would you like to select commits? Between two specific commits
-
-📋 Select commit range for release notes generation:
-
-• First select the OLDER commit (start of range)
-• Then select the NEWER commit (end of range)
-• Use arrow keys to navigate, Enter to select
-
-? 📍 Select the starting commit (OLDER): abc12345 - Initial project setup (John Doe)
-? 📍 Select the ending commit (NEWER): def67890 - Add user authentication (Jane Smith)
+? Select the starting commit (OLDER): abc12345 - Initial project setup (John Doe)
+? Select the ending commit (NEWER): def67890 - Add user authentication (Jane Smith)
 ? Where would you like the output? Display in console
 ? Proceed with release notes generation? Yes
 
-📝 Processing 5 commits between abc12345 and def67890 for release notes generation...
+Processing 5 commits between abc12345 and def67890...
 
-📋 Generated Release Notes:
-
+Generated Release Notes:
 # Release Notes
 ...
 ```
