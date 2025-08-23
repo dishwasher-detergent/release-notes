@@ -1,0 +1,29 @@
+{
+  "name": "release-notes-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo for release notes packages",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev": "npm run dev --workspaces",
+    "clean": "npm run clean --workspaces",
+    "test": "npm run test --workspaces",
+    "setup": "npm install && npm run build",
+    "pack:core": "cd packages/release-notes && npm pack",
+    "install:local": "npm run pack:core && cd packages/release-notes-cli && npm install ../release-notes/kenny-release-notes-*.tgz",
+    "publish:core": "cd packages/release-notes && npm publish",
+    "publish:cli": "cd packages/release-notes-cli && npm publish",
+    "publish:all": "npm run build && npm run publish:core && npm run publish:cli"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.1",
+    "typescript": "^5.5.4",
+    "rimraf": "^6.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
