@@ -9,7 +9,7 @@ import ora from "ora";
 import { join } from "path";
 import { simpleGit } from "simple-git";
 
-import { ReleaseNotesGenerator } from "./release-notes-generator";
+import { ReleaseNotesGenerator } from "./release-notes-generator.js";
 
 const program = new Command();
 
