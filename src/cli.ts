@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { ReleaseNotesGenerator } from "@knth/release-notes";
 import chalk from "chalk";
 import { Command } from "commander";
 import { writeFileSync } from "fs";
@@ -9,6 +8,8 @@ import { AzureOpenAI } from "openai";
 import ora from "ora";
 import { join } from "path";
 import { simpleGit } from "simple-git";
+
+import { ReleaseNotesGenerator } from "./release-notes-generator";
 
 const program = new Command();
 

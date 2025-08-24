@@ -1,170 +1,70 @@
-# AI Release Notes Generator
+# @knth/release-notes-cli
 
-TypeScript npm package ecosystem for generatin## Environment Variables
-
-Set to skip prompts:
-
-```bash
-export AZURE_OPENAI_API_KEY="your-azure-openai-api-key"
-```
-
-## Configuration
-
-### Azure OpenAI Setup
-
-Required:
-
-1. API Key from Azure OpenAI resource
-2. Endpoint (e.g., `https://your-resource.cognitiveservices.azure.com/`)
-3. Deployment with model (e.g., `gpt-4o-mini`, `gpt-4o`) git history using Azure OpenAI. Contains core library and interactive CLI.
-
-## Packages
-
-### [@knth/release-notes](./packages/release-notes)
-
-Core library for programmatic release note generation.
-
-### [@knth/release-notes-cli](./packages/release-notes-cli)
-
-Interactive CLI tool for the core library.
-
-## Features
-
-- AI-powered release note generation using Azure OpenAI
-- Interactive CLI wizard with no complex arguments
-- Git commit analysis and categorization
-- Flexible commit selection (last N commits or range)
-- Paginated commit browsing
-- Real-time streaming responses
-- Markdown output format
-- Terminal UI with colors and progress indicators
-- Console display or file output
-- Cost-effective with GPT-4o Mini default
+Interactive CLI for generating release notes from git history using Azure OpenAI.
 
 ## Installation
-
-### CLI Usage (Recommended)
 
 ```bash
 npm install -g @knth/release-notes-cli
 ```
 
-### Programmatic Usage
+## Usage
 
-```bash
-npm install @knth/release-notes
-```
-
-## Quick Start
-
-### CLI Usage
+Run the interactive wizard:
 
 ```bash
 release-notes
-# or use the short alias:
+```
+
+Or use the short alias:
+
+```bash
 rn
 ```
 
-### Programmatic Usage
+### Command Line Options
 
-```typescript
-import { ReleaseNotesGenerator } from "@knth/release-notes";
-import { AzureOpenAI } from "openai";
-
-const client = new AzureOpenAI({
-  apiKey: "your-azure-openai-api-key",
-  endpoint: "https://your-resource.cognitiveservices.azure.com/",
-  apiVersion: "2024-10-21",
-});
-
-const generator = new ReleaseNotesGenerator({
-  repoPath: "/path/to/repo",
-  client: client,
-  deployment: "gpt-4o-mini",
-});
-
-const releaseNotes = await generator.generateReleaseNotes();
-```
-
-## CLI Usage
-
-Interactive wizard eliminates complex command-line arguments:
+Skip interactive prompts by providing options directly:
 
 ```bash
-release-notes
+release-notes --api-key "your-key" --endpoint "https://your-resource.cognitiveservices.azure.com/" --deployment "gpt-4o-mini" --commit-mode "last" --commit-count 5 --output-mode "console"
 ```
 
-Prompts for:
+Available options:
 
-1. Azure OpenAI configuration (API Key, Endpoint, Deployment)
-2. Repository path (defaults to current directory)
-3. Commit selection (last N commits or specific range)
-4. Output options (console or file)
-   - Save to file (e.g., `RELEASE_NOTES.md`)
+- `--api-key <key>` - Azure OpenAI API key
+- `--endpoint <url>` - Azure OpenAI endpoint URL
+- `--deployment <name>` - Azure OpenAI deployment name (default: gpt-4o-mini)
+- `--repo-path <path>` - Repository path (default: current directory)
+- `--commit-mode <mode>` - Commit selection: `last` or `range`
+- `--commit-count <number>` - Number of recent commits (for last mode)
+- `--from-commit <hash>` - Starting commit hash (for range mode)
+- `--to-commit <hash>` - Ending commit hash (for range mode)
+- `--output-mode <mode>` - Output mode: `console` or `file`
+- `--output-file <filename>` - Output filename (for file mode)
 
-## Environment Variables
+## Features
 
-You can set these environment variables to skip some prompts:
-
-```bash
-export AZURE_OPENAI_API_KEY="your-azure-openai-api-key"
-```
-
-## Configuration
-
-### Azure OpenAI Setup
-
-You'll need an Azure OpenAI resource with:
-
-1. **API Key**: Found in your Azure OpenAI resource
-2. **Endpoint**: Your resource endpoint (e.g., `https://your-resource.cognitiveservices.azure.com/`)
-3. **Deployment**: A deployed model (e.g., `gpt-4o-mini`, `gpt-4o`)
-
-### Core Library Interface
-
-```typescript
-interface ReleaseNotesOptions {
-  repoPath: string; // Path to git repository
-  client: AzureOpenAI; // Azure OpenAI client instance
-  deployment: string; // Azure OpenAI deployment name
-  maxCommits?: number; // Number of commits for "last N" mode
-  fromCommit?: string; // Starting commit hash for range mode
-  toCommit?: string; // Ending commit hash for range mode
-}
-```
+- Interactive CLI wizard with no complex arguments required
+- Command-line options for automation and scripting
+- Paginated commit selection and browsing
+- Real-time streaming responses
+- Console display or file output
+- Terminal UI with colors and progress indicators
 
 ## How It Works
 
 1. Interactive setup guides through Azure OpenAI configuration
 2. Choose commit selection: last N commits or specific range with pagination
-3. Extract commit information (messages, authors, dates, files)
-4. Process with Azure OpenAI using streaming responses
-5. Generate categorized Markdown output
+3. Select output options: console display or file save
 
-## Output Format
+## Environment Variables
 
-Generated release notes structure:
+Set to skip prompts:
 
-```markdown
-# Release Notes
-
-**Release Date:** 2025-08-22
-
-### Breaking Changes
-
-- Breaking changes affecting existing functionality
-
-### New Features
-
-- New features and enhancements
-
-### Bug Fixes
-
-- Bug fixes and corrections
-
-### Other Changes
-
-- Documentation, refactoring, etc.
+```bash
+export AZURE_OPENAI_API_KEY="your-azure-openai-api-key"
+export AZURE_OPENAI_ENDPOINT="https://your-resource.cognitiveservices.azure.com/"
 ```
 
 ## Requirements
@@ -173,40 +73,6 @@ Generated release notes structure:
 - Git repository with commit history
 - Azure OpenAI resource and API key
 
-## Troubleshooting
-
-### Common Issues
-
-1. "Not a git repository" - Run in directory with git history
-2. "No commits found" - Check repository has commits in range
-3. Azure OpenAI errors - Verify API key, endpoint, deployment
-4. Permission errors - Ensure git repository access
-
-### Getting Help
-
-1. Check error messages for guidance
-2. Verify Azure OpenAI configuration
-3. Ensure git repository accessibility
-4. Open GitHub issue with setup details
-
 ## License
 
-MIT License - see LICENSE file for details.
-
-## Contributing
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Make changes and add tests if applicable
-4. Commit changes (`git commit -m 'Add amazing feature'`)
-5. Push to branch (`git push origin feature/amazing-feature`)
-6. Open Pull Request
-
-## Support
-
-For issues or questions:
-
-- Check README for common solutions
-- Open GitHub issue for bugs
-- Submit feature requests via GitHub issues
-- Contact maintainers for support
+MIT
