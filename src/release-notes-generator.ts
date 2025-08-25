@@ -3,6 +3,8 @@ import { AzureOpenAI } from "openai";
 import ora from "ora";
 import { simpleGit, SimpleGit } from "simple-git";
 
+const MAX_COMMIT_DIFF_CHARS = 3000;
+
 export interface GitCommit {
   hash: string;
   date: string;
@@ -12,9 +14,7 @@ export interface GitCommit {
 }
 
 export interface ReleaseNotesOptions {
-  repoPath: string;
   client: AzureOpenAI;
-  deployment: string;
   maxCommits?: number;
   fromCommit?: string;
   toCommit?: string;
@@ -23,50 +23,39 @@ export interface ReleaseNotesOptions {
 export class ReleaseNotesGenerator {
   private git: SimpleGit;
   private client: AzureOpenAI;
-  private deployment: string;
   private maxCommits: number;
   private fromCommit?: string;
   private toCommit?: string;
 
   constructor(options: ReleaseNotesOptions) {
-    this.git = simpleGit(options.repoPath);
+    this.git = simpleGit(process.cwd());
     this.client = options.client;
-    this.deployment = options.deployment;
     this.maxCommits = options.maxCommits || 5;
     this.fromCommit = options.fromCommit;
     this.toCommit = options.toCommit;
   }
-
-  /**
-   * Check if we're in a valid git repository
-   */
   async checkGitRepo(): Promise<void> {
-    const spinner = ora("Checking git repository...").start();
+    const spinner = ora("Checking repository...").start();
     try {
       const isRepo = await this.git.checkIsRepo();
       if (!isRepo) {
         spinner.fail(chalk.red("Not a git repository"));
         throw new Error("Not a git repository");
       }
-      spinner.succeed(chalk.green("Valid git repository detected"));
+      spinner.succeed(chalk.green("Git repository OK"));
     } catch (error) {
-      spinner.fail(chalk.red("Git repository check failed"));
+      spinner.fail(chalk.red("Git check failed"));
       throw new Error(`Git repository check failed: ${error}`);
     }
   }
 
-  /**
-   * Get the last N commits from the current branch
-   */
   async getLastCommits(count: number = this.maxCommits): Promise<GitCommit[]> {
-    const spinner = ora(`Fetching last ${count} commits...`).start();
+    const spinner = ora(`Fetching ${count} commits...`).start();
     try {
-      const log = await this.git.log({
-        maxCount: count,
-      });
+      const log = await this.git.log({ maxCount: count });
 
       if (log.all.length === 0) {
-        spinner.fail(chalk.red("No commits found in repository history"));
+        spinner.fail(chalk.red("No commits found"));
         throw new Error("No commits found in repository history");
       }
 
@@ -78,50 +67,31 @@ export class ReleaseNotesGenerator {
         author_email: commit.author_email,
       }));
 
-      spinner.succeed(
-        chalk.green(`Found ${commits.length} commits in git history`)
-      );
+      spinner.succeed(chalk.green(`Found ${commits.length} commits`));
       return commits;
     } catch (error) {
-      spinner.fail(chalk.red("Failed to fetch git history"));
+      spinner.fail(chalk.red("Failed to fetch commits"));
       console.error(chalk.red("Git log error:"), error);
       throw new Error(`Failed to get git history: ${error}`);
     }
   }
 
-  /**
-   * Get commits between two commit hashes (inclusive)
-   */
   async getCommitsBetween(
     fromCommit: string,
     toCommit: string
   ): Promise<GitCommit[]> {
     const spinner = ora(
-      `Fetching commits between ${fromCommit.substring(
+      `Fetching commits ${fromCommit.substring(0, 8)}..${toCommit.substring(
         0,
         8
-      )}...${toCommit.substring(0, 8)} (inclusive)...`
+      )}`
     ).start();
     try {
-      // Use git log with range syntax: fromCommit^..toCommit to include fromCommit
-      // This makes the range inclusive of both commits
-      const log = await this.git.log({
-        from: `${fromCommit}^`,
-        to: toCommit,
-      });
+      const log = await this.git.log({ from: `${fromCommit}^`, to: toCommit });
 
       if (log.all.length === 0) {
-        spinner.fail(
-          chalk.red(
-            `No commits found between ${fromCommit.substring(
-              0,
-              8
-            )} and ${toCommit.substring(0, 8)}`
-          )
-        );
-        throw new Error(
-          `No commits found between ${fromCommit} and ${toCommit}`
-        );
+        spinner.fail(chalk.red("No commits found in range"));
+        throw new Error(`No commits found between ${fromCommit} and ${toCommit}`);
       }
 
       const commits = log.all.map((commit: any) => ({
@@ -132,71 +102,41 @@ export class ReleaseNotesGenerator {
         author_email: commit.author_email,
       }));
 
-      spinner.succeed(
-        chalk.green(
-          `Found ${commits.length} commits between ${fromCommit.substring(
-            0,
-            8
-          )} and ${toCommit.substring(0, 8)}`
-        )
-      );
+      spinner.succeed(chalk.green(`Found ${commits.length} commits in range`));
       return commits;
     } catch (error) {
-      spinner.fail(chalk.red("Failed to fetch git history between commits"));
+      spinner.fail(chalk.red("Failed to fetch commits in range"));
       console.error(chalk.red("Git log error:"), error);
-      throw new Error(
-        `Failed to get git history between ${fromCommit} and ${toCommit}: ${error}`
-      );
+      throw new Error(`Failed to get git history between ${fromCommit} and ${toCommit}: ${error}`);
     }
   }
 
-  /**
-   * Get detailed commit information for each commit
-   */
   async getCommitDetails(commits: GitCommit[]): Promise<string[]> {
-    const spinner = ora("Analyzing commit details...").start();
+    const spinner = ora("Analyzing commits...").start();
     const details: string[] = [];
 
     for (let i = 0; i < commits.length; i++) {
       const commit = commits[i];
-      spinner.text = `Analyzing commit ${i + 1}/${
-        commits.length
-      }: ${commit.message.substring(0, 50)}...`;
+      spinner.text = `Analyzing ${i + 1}/${commits.length}: ${commit.message.substring(0, 50)}...`;
 
       try {
-        const show = await this.git.show([
-          commit.hash,
-          "--stat",
-          "--format=fuller",
-        ]);
+        const show = await this.git.show([commit.hash, "--stat", "--format=fuller", "--patch"]);
+        const diff = show.length > MAX_COMMIT_DIFF_CHARS ? show.substring(0, MAX_COMMIT_DIFF_CHARS) + "\n...[truncated]\n" : show;
 
-        details.push(`
-Commit: ${commit.message}
-Author: ${commit.author_name} <${commit.author_email}>
-Date: ${commit.date}
-Hash: ${commit.hash}
-
-${show}
----
-        `);
+        details.push([
+          "--- Code changes (diff) ---",
+          diff,
+          "---",
+        ].join("\n"));
       } catch (error) {
-        console.warn(
-          chalk.yellow(
-            `⚠ Failed to get details for commit ${commit.hash.substring(0, 8)}`
-          )
-        );
+        console.warn(chalk.yellow(`Failed to get details for ${commit.hash.substring(0, 8)}`));
       }
     }
 
-    spinner.succeed(
-      chalk.green(`Analyzed ${details.length} commits successfully`)
-    );
+    spinner.succeed(chalk.green(`Analyzed ${details.length} commits`));
     return details;
   }
 
-  /**
-   * Generate release notes using AI
-   */
   async generateReleaseNotes(): Promise<string> {
     await this.checkGitRepo();
 
@@ -217,77 +157,57 @@ ${show}
       throw new Error("No commits found in the repository");
     }
 
-    const commitRangeDesc =
-      this.fromCommit && this.toCommit
-        ? `between ${this.fromCommit.substring(
-            0,
-            8
-          )} and ${this.toCommit.substring(0, 8)}`
-        : `last ${commits.length}`;
+    const commitRangeDesc = this.fromCommit && this.toCommit
+      ? `between ${this.fromCommit.substring(0, 8)} and ${this.toCommit.substring(0, 8)}`
+      : `last ${commits.length}`;
 
-    console.log(
-      chalk.blue(
-        `\n📝 Processing ${commits.length} commits ${commitRangeDesc} for release notes generation...\n`
-      )
-    );
+    console.log(chalk.blue(`\n📝 Processing ${commits.length} commits ${commitRangeDesc}...\n`));
 
     const commitDetails = await this.getCommitDetails(commits);
     const combinedDetails = commitDetails.join("\n");
 
-    const aiSpinner = ora("Generating release notes with AI...").start();
+  const aiSpinner = ora("Generating release notes...").start();
 
     const prompt = `
-Analyze the following git commits and generate release notes in clean Markdown format.
-Focus on user-facing changes and categorize them appropriately. 
-This will be written directly to end users, that are non-technical, 
-avoid adding anything that is too technical or detailed.
+You will generate user-facing release notes in plain Markdown for non-technical end users.
+
+Instructions:
+- Read the commit history below and extract only items that matter to an end user of the application.
+- Ignore developer-only changes such as: upgrading models or machine-learning artifacts, README or docs updates, CI/workflow changes, test changes, linting/style changes, pure refactors that do not change behavior, and dependency or build-tool bumps unless they directly change user-visible behavior.
+- Include only: new features or enhancements users will notice, UI/UX changes, performance improvements that affect users, bug fixes that change observable behavior, and explicit breaking changes that require user action.
+- Do not include any duplicates or near-duplicates.
+- For each item, write one short, plain-language sentence (no technical jargon), starting with a verb when appropriate (e.g., "Users can now...", "Fixed an issue where...").
+- Group items under these headings (omit any empty section):
+  ### ⚠️ Breaking Changes
+  ### ✨ New Features
+  ### 🐛 Bug Fixes
+  ### 📝 Other Changes (only include user-relevant things like support for new file types, integrations, or settings that users can change)
+- If a section has no items, omit that section entirely. Do not create a section with No x changes in this release.
+- If a change is internal or not user-facing, skip it entirely.
+- If nothing user-facing is present, return a short note: "No user-facing changes in this release." under the # Release Notes heading.
+- Return ONLY Markdown content for the release notes. Do not add explanations, metadata, or commentary.
 
 Git History:
 ${combinedDetails}
-
-Please generate release notes with the following structure:
 
 # Release Notes
 
 **Release Date:** ${new Date().toISOString().split("T")[0]}
 
-### ⚠️ Breaking Changes
-- List any breaking changes that affect existing functionality (if any)
-
-### ✨ New Features
-- List new features or enhancements
-
-### 🐛 Bug Fixes
-- List bug fixes and corrections
-
-### 📝 Other Changes
-- List other notable changes (documentation, refactoring, etc.)
-
-Each item should be a clear, concise description from a user's perspective.
-If a category has no items, you may omit that section entirely.
-Return ONLY the markdown content, no additional text or formatting.
 `;
 
     try {
       const stream = await this.client.chat.completions.create({
-        model: this.deployment,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 1000,
+        model: "gpt-4o-mini",
+        messages: [{role: "system", content: "You are a helpful assistant that generates release notes from commit messages."},{ role: "user", content: prompt }],
+        max_completion_tokens: 16384,
         stream: true,
       });
 
-      aiSpinner.succeed(chalk.green("Streaming release notes from AI...\n"));
-
+      aiSpinner.succeed(chalk.green("AI streaming started\n"));
       console.log(chalk.blue("📋 Generated Release Notes:\n"));
 
       let fullContent = "";
-
       for await (const chunk of stream) {
         const content = chunk.choices[0]?.delta?.content || "";
         if (content) {
@@ -296,12 +216,7 @@ Return ONLY the markdown content, no additional text or formatting.
         }
       }
 
-      console.log("\n"); // Add a newline at the end
-
-      if (!fullContent.trim()) {
-        throw new Error("No content returned from Azure OpenAI");
-      }
-
+      if (!fullContent.trim()) throw new Error("No content returned from Azure OpenAI");
       return fullContent.trim();
     } catch (error) {
       console.log(JSON.stringify(error));

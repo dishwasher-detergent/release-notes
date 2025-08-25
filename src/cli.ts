@@ -16,43 +16,43 @@ const program = new Command();
 interface WizardAnswers {
   apiKey: string;
   endpoint: string;
-  deployment: string;
-  commitMode: "last" | "range";
-  commitCount?: number;
-  fromCommit?: string;
-  toCommit?: string;
+  fromCommit: string;
+  toCommit: string;
   outputMode: "console" | "file";
   outputFile?: string;
-  repoPath?: string;
 }
 
 interface CliOptions {
   apiKey?: string;
   endpoint?: string;
-  deployment?: string;
-  repoPath?: string;
-  commitMode?: "last" | "range";
-  commitCount?: number;
   fromCommit?: string;
   toCommit?: string;
   outputMode?: "console" | "file";
   outputFile?: string;
 }
 
-async function getRecentCommits(
-  repoPath?: string
-): Promise<Array<{ name: string; value: string }>> {
+async function getRecentCommits(): Promise<Array<{ name: string; value: string }>> {
   try {
-    const git = simpleGit(repoPath || process.cwd());
+    const git = simpleGit(process.cwd());
     const log = await git.log({ maxCount: 50 });
 
-    return log.all.map((commit) => ({
-      name: `${commit.hash.substring(0, 8)} - ${commit.message.substring(
-        0,
-        60
-      )}${commit.message.length > 60 ? "..." : ""} (${commit.author_name})`,
-      value: commit.hash,
-    }));
+    return log.all.map((commit) => {
+      const shortHash = commit.hash.substring(0, 8);
+      const shortMsg = commit.message.substring(0, 60) + (commit.message.length > 60 ? "..." : "");
+
+      let dateLabel = "";
+      try {
+        const d = new Date(commit.date);
+        dateLabel = d.toLocaleString();
+      } catch {
+        dateLabel = commit.date || "";
+      }
+
+      return {
+        name: `${shortHash} ${dateLabel} - ${shortMsg} (${commit.author_name})`,
+        value: commit.hash,
+      };
+    });
   } catch (error) {
     return [];
   }
@@ -82,38 +82,6 @@ async function runWizard(cliOptions: CliOptions = {}): Promise<WizardAnswers> {
     });
   }
 
-  if (!cliOptions.deployment) {
-    questions.push({
-      type: "input",
-      name: "deployment",
-      message: "Enter your deployment name:",
-      validate: (input: string) =>
-        input.length > 0 || "Deployment name is required",
-      default: "gpt-4o-mini",
-    });
-  }
-
-  if (!cliOptions.repoPath) {
-    questions.push({
-      type: "input",
-      name: "repoPath",
-      message: "Repository path (press Enter for current directory):",
-      default: process.cwd(),
-    });
-  }
-
-  if (!cliOptions.commitMode) {
-    questions.push({
-      type: "list",
-      name: "commitMode",
-      message: "How would you like to select commits?",
-      choices: [
-        { name: "Last N commits", value: "last" },
-        { name: "Between two specific commits", value: "range" },
-      ],
-    });
-  }
-
   const basicAnswers = await inquirer.prompt(questions);
 
   let answers: WizardAnswers = {
@@ -125,103 +93,68 @@ async function runWizard(cliOptions: CliOptions = {}): Promise<WizardAnswers> {
       cliOptions.endpoint ||
       basicAnswers.endpoint ||
       process.env.AZURE_OPENAI_ENDPOINT!,
-    deployment: cliOptions.deployment || basicAnswers.deployment,
-    commitMode: cliOptions.commitMode || basicAnswers.commitMode,
-    repoPath: cliOptions.repoPath || basicAnswers.repoPath,
     outputMode: cliOptions.outputMode || "console",
+    fromCommit: "",
+    toCommit: "",
   };
 
-  if (answers.commitMode === "last") {
-    if (cliOptions.commitCount) {
-      answers.commitCount = cliOptions.commitCount;
-    } else {
-      const commitCountAnswer = await inquirer.prompt([
-        {
-          type: "input",
-          name: "commitCount",
-          message: "How many recent commits to analyze?",
-          default: "5",
-          validate: (input: string) => {
-            const num = parseInt(input);
-            return (
-              (!isNaN(num) && num > 0) || "Must be a number greater than 0"
-            );
-          },
-        },
-      ]);
-      answers.commitCount = parseInt(commitCountAnswer.commitCount);
-    }
+  if (cliOptions.fromCommit && cliOptions.toCommit) {
+    answers.fromCommit = cliOptions.fromCommit;
+    answers.toCommit = cliOptions.toCommit;
   } else {
-    if (cliOptions.fromCommit && cliOptions.toCommit) {
-      answers.fromCommit = cliOptions.fromCommit;
-      answers.toCommit = cliOptions.toCommit;
-    } else {
-      const spinner = ora("Fetching recent commits...").start();
-      const recentCommits = await getRecentCommits(answers.repoPath);
+    const spinner = ora("Fetching recent commits...").start();
+    const recentCommits = await getRecentCommits();
 
-      if (recentCommits.length === 0) {
-        spinner.fail("Could not fetch commits from repository");
-        console.log(
-          chalk.red(
-            "❌ Unable to fetch commits. Please check that you're in a valid git repository."
-          )
-        );
-        process.exit(1);
-      }
-
-      spinner.succeed(`Loaded ${recentCommits.length} commits`);
-
+    if (recentCommits.length === 0) {
+      spinner.fail("Could not fetch commits from repository");
       console.log(
-        chalk.blue("\n📋 Select commit range for release notes generation:\n")
+        chalk.red(
+          "❌ Unable to fetch commits. Please check that you're in a valid git repository."
+        )
       );
-      console.log(
-        chalk.gray("• First select the OLDER commit (start of range)")
-      );
-      console.log(chalk.gray("• Then select the NEWER commit (end of range)"));
-      console.log(
-        chalk.gray("• Use arrow keys to navigate, Enter to select\n")
-      );
-
-      const commitRange = await inquirer.prompt([
-        {
-          type: "list",
-          name: "fromCommit",
-          message: "📍 Select the starting commit (OLDER):",
-          choices: recentCommits,
-          pageSize: 15,
-          loop: false,
-        },
-        {
-          type: "list",
-          name: "toCommit",
-          message: "📍 Select the ending commit (NEWER):",
-          choices: recentCommits,
-          pageSize: 15,
-          loop: false,
-        },
-      ]);
-
-      answers.fromCommit = commitRange.fromCommit;
-      answers.toCommit = commitRange.toCommit;
-
-      const fromIndex = recentCommits.findIndex(
-        (c) => c.value === answers.fromCommit
-      );
-      const toIndex = recentCommits.findIndex(
-        (c) => c.value === answers.toCommit
-      );
-
-      if (fromIndex <= toIndex) {
-        console.log(
-          chalk.yellow(
-            "\n⚠ Warning: You selected commits in reverse order. Swapping them..."
-          )
-        );
-        const temp = answers.fromCommit;
-        answers.fromCommit = answers.toCommit;
-        answers.toCommit = temp;
-      }
+      process.exit(1);
     }
+
+    spinner.succeed(`Loaded ${recentCommits.length} commits`);
+
+    console.log(chalk.blue("\n📋 Select commit range for release notes generation:\n"));
+    console.log(chalk.gray("• First select the OLDER commit (start of range)"));
+    console.log(chalk.gray("• Then select the NEWER commit (end of range)"));
+    console.log(chalk.gray("• Use arrow keys to navigate, Enter to select\n"));
+
+    const fromAnswer = await inquirer.prompt([
+      {
+        type: "list",
+        name: "fromCommit",
+        message: "📍 Select the START (older) commit:",
+        choices: recentCommits,
+        pageSize: 15,
+        loop: false,
+      },
+    ]);
+
+    const chosenFrom: string = fromAnswer.fromCommit;
+    const fromIndex = recentCommits.findIndex((c) => c.value === chosenFrom);
+    if (fromIndex === -1) {
+      console.log(chalk.red("Invalid starting commit selected."));
+      process.exit(1);
+    }
+
+    const toChoices = recentCommits.slice(0, fromIndex + 1);
+
+    const toAnswer = await inquirer.prompt([
+      {
+        type: "list",
+        name: "toCommit",
+        message: "📍 Select the END (newer) commit:",
+        choices: toChoices,
+        pageSize: 15,
+        loop: false,
+      },
+    ]);
+
+    answers.fromCommit = chosenFrom;
+    answers.toCommit = toAnswer.toCommit;
   }
 
   if (!cliOptions.outputMode) {
@@ -262,20 +195,9 @@ async function main(options: CliOptions) {
     const answers = await runWizard(options);
 
     console.log(chalk.blue("\n📋 Configuration Summary:"));
-    console.log(chalk.gray(`• Deployment: ${answers.deployment}`));
-    console.log(chalk.gray(`• Repository: ${answers.repoPath}`));
-
-    if (answers.commitMode === "last") {
-      console.log(chalk.gray(`• Commits: Last ${answers.commitCount}`));
-    } else {
-      console.log(chalk.gray(`• Commit range:`));
-      console.log(
-        chalk.gray(`  └─ From: ${answers.fromCommit?.substring(0, 8)} (older)`)
-      );
-      console.log(
-        chalk.gray(`  └─ To:   ${answers.toCommit?.substring(0, 8)} (newer)`)
-      );
-    }
+    console.log(chalk.gray(`• Commit range:`));
+    console.log(chalk.gray(`  └─ From: ${answers.fromCommit?.substring(0, 8)} (older)`));
+    console.log(chalk.gray(`  └─ To:   ${answers.toCommit?.substring(0, 8)} (newer)`));
 
     if (answers.outputMode === "file") {
       console.log(chalk.gray(`• Output: ${answers.outputFile}`));
@@ -297,21 +219,17 @@ async function main(options: CliOptions) {
       process.exit(0);
     }
 
-    console.log(); // Add spacing
-
     const client = new AzureOpenAI({
       apiKey: answers.apiKey,
       endpoint: answers.endpoint,
-      apiVersion: "2024-10-21",
+      deployment: "gpt-4o-mini",
+      apiVersion: "2024-04-01-preview",
     });
 
     const generatorOptions = {
-      repoPath: answers.repoPath!,
       client: client,
-      deployment: answers.deployment,
-      ...(answers.commitMode === "last"
-        ? { maxCommits: answers.commitCount! }
-        : { fromCommit: answers.fromCommit!, toCommit: answers.toCommit! }),
+      fromCommit: answers.fromCommit!,
+      toCommit: answers.toCommit!,
     };
 
     const generator = new ReleaseNotesGenerator(generatorOptions);
@@ -341,29 +259,17 @@ async function main(options: CliOptions) {
 program
   .name("release-notes")
   .description("Generate release notes based on git history using Azure OpenAI")
-  .version("1.0.0")
+  .version("2.0.1")
   .option("--api-key <key>", "Azure OpenAI API key")
   .option("--endpoint <url>", "Azure OpenAI endpoint URL")
-  .option("--deployment <name>", "Azure OpenAI deployment name", "gpt-4o-mini")
-  .option("--repo-path <path>", "Repository path", process.cwd())
-  .option("--commit-mode <mode>", "Commit selection mode: last or range")
-  .option(
-    "--commit-count <number>",
-    "Number of recent commits (for last mode)",
-    parseInt
-  )
-  .option("--from-commit <hash>", "Starting commit hash (for range mode)")
-  .option("--to-commit <hash>", "Ending commit hash (for range mode)")
+  .option("--from-commit <hash>", "Starting commit hash (older)")
+  .option("--to-commit <hash>", "Ending commit hash (newer)")
   .option("--output-mode <mode>", "Output mode: console or file")
   .option("--output-file <filename>", "Output filename (for file mode)")
   .action((options) => {
     const cliOptions: CliOptions = {
       apiKey: options.apiKey,
       endpoint: options.endpoint,
-      deployment: options.deployment,
-      repoPath: options.repoPath,
-      commitMode: options.commitMode as "last" | "range",
-      commitCount: options.commitCount,
       fromCommit: options.fromCommit,
       toCommit: options.toCommit,
       outputMode: options.outputMode as "console" | "file",
